@@ -60,7 +60,7 @@ public class MobileService extends CombiService implements Runnable {
 	// Thread thread; 2018-01-11
 	private String m_SmsReceive;
 	private String m_Sms;
-	private AndroidManager androidManager;
+	//private AndroidManager androidManager;
 	public ConcurrentHashMap<String, PushItem> sb;
 	private int retryCount = 0;
 	public ExecutorService executorsPool; //2017-12-13 
@@ -100,7 +100,7 @@ public class MobileService extends CombiService implements Runnable {
 
 		new ManagementFiles(reservedMessagePath, Integer.parseInt(config.get("MAX_LINES")),
 				Integer.parseInt(config.get("TERMINATE")));
-		this.androidManager = new AndroidManager();
+		//this.androidManager = new AndroidManager();
 
 		// 2017-12-13
 		try {
@@ -733,13 +733,13 @@ public class MobileService extends CombiService implements Runnable {
 		th.start();*/
 	}
 
-	public void sendPushMessageAndroid(String id, String regId) {
+	/*public void sendPushMessageAndroid(String id, String regId) {
 		try {
 			androidManager.sendAndroidPushMessage(id, regId);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-	}
+	}*/
 
 	public void sendPC(String msgId, String id, String senderName, String date, String title, String message,
 			String url, String myId) {
