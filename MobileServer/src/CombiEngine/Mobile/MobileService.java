@@ -462,9 +462,10 @@ public class MobileService extends CombiService implements Runnable {
 
 	public void ProcessChat(String fromId, String fromName, String fromNickName, String toId, String roomId,
 			String date, String message, Connector conn) {
-		if (message.indexOf("[READ_COMPLETE]") < 0 && message.indexOf("[ROOM_KEY]") < 0
+		//2017-12-13
+		/*if (message.indexOf("[READ_COMPLETE]") < 0 && message.indexOf("[ROOM_KEY]") < 0
 				&& message.indexOf("[ROOM_IN]") < 0 && message.indexOf("[ROOM_OUT]") < 0)
-			checkAndroid(toId, fromId, conn, roomId, fromName);
+			checkAndroid(toId, fromId, conn, roomId, fromName);*/
 
 		send(toId, fromId + "\n" + fromName + "\n" + fromNickName, date, "CHAT", message, roomId, fromId, conn);
 	}
@@ -488,7 +489,8 @@ public class MobileService extends CombiService implements Runnable {
 		return out;
 	}
 
-	private void checkAndroid(String targetId, String fromId, Connector conn, String roomId, String name) {
+	//2017-12-13
+	/*private void checkAndroid(String targetId, String fromId, Connector conn, String roomId, String name) {
 		try {
 			if (roomId.startsWith("SendMapData")) {
 				return;
@@ -532,7 +534,7 @@ public class MobileService extends CombiService implements Runnable {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-	}
+	}*/
 
 	public void ProcessCustom(String command, ArrayList<String> param, Connector conn) {
 	}
