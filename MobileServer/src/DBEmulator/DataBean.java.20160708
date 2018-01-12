@@ -1,0 +1,449 @@
+package DBEmulator;
+
+import CombiEngine.Codec.AmCodec;
+import CombiEngine.Selector.Connector;
+import Hub.ConnectorWithList;
+import Hub.HubProcessor;
+import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.Iterator;
+
+public class DataBean
+{
+	public HashMap<String, PartObject> parts;
+	public HashMap<String, UserObject> users;
+	
+	private AmCodec codec;
+	private boolean m_bDebug;
+	
+	private HashMap<String, Observer> obs;
+	
+	public HashMap<String, String> phoneNumbers;
+	
+	public DataBean(boolean m_bDebug)
+	{
+		this.parts = new HashMap<String, PartObject>();
+		this.users = new HashMap<String, UserObject>();
+		
+		this.codec = new AmCodec();
+		this.m_bDebug = m_bDebug;
+		
+		PartObject topPart = new PartObject("0", "TOP", "TOP", "0", "");
+		parts.put("0", topPart);
+		
+		obs = new HashMap<String, Observer>();
+		
+		this.phoneNumbers = new HashMap<String, String>();
+	}
+
+
+	// 2013.12.03
+	public synchronized void addSubPart() {
+		Iterator<PartObject> it = parts.values().iterator();
+		
+		while ( it.hasNext() ) {
+			PartObject prt = it.next();
+			
+			if ( prt == null ) continue;
+			
+			PartObject parent = parts.get(prt.high); //자식트리의 high값은 부모트리의 id값이다. 있으면 그 id의 자식트리로 넣는다.
+			
+			if ( parent != null ) {
+				parent.subParts.add(prt);
+				//System.out.println("[addSubPart]: "+parent.name +", ->subPart:"+prt.name);
+			}
+		}
+	}
+	
+	// 2013.12.03
+	public synchronized void addSubUser() {
+		Iterator<UserObject> it = users.values().iterator();
+		
+		while ( it.hasNext() ) {
+			UserObject usr = it.next();
+			
+			if ( usr == null ) continue;
+			
+			PartObject parent = parts.get(usr.high);
+			
+			if ( parent != null ) {
+				parent.subUsers.add(usr);
+			}
+		}
+	}
+
+	public synchronized boolean addPart(String id, String high, String name, String order, String param1)
+	{
+		PartObject newPart = new PartObject(id, high, name, order, param1);
+		parts.put(id, newPart);
+		
+		if(HubProcessor.isOrgEnd)
+		{
+        		PartObject parentPart = parts.get(high);
+        		if ( parentPart == null )
+        		{
+        			parentPart = new PartObject(high, "TOP", "TOP", "0", "");
+        			parts.put(high, parentPart);
+        		}
+        		
+        		//parentPart.subParts.add(newPart);
+        		
+        		boolean isEmpty = true;
+        		for(int i=0; i<parentPart.subParts.size(); i++)
+        		{
+        		        if(parentPart.subParts.get( i ).id == newPart.id)
+        		        {
+        		                isEmpty = false;
+        		                break;
+        		        }
+        		}
+        		
+        		if(isEmpty)
+        		        parentPart.subParts.add(newPart);
+		}
+		
+		return true;
+	}
+	
+	public synchronized boolean addUser(String id, String high, String ip, String icon, String name, String password, String order, String param1, String param2, String param3)
+	{
+		UserObject newUser = new UserObject(id, high, ip, Integer.parseInt(icon), name, password, order, param1, param2, param3);
+		users.put(id, newUser);
+		
+		if(HubProcessor.isOrgEnd)
+		{
+        		PartObject parentPart = parts.get(high);
+        		if ( parentPart == null )
+        		{
+        			parentPart = new PartObject(high, "0", "", "", "");
+        			parts.put(high, parentPart);
+        		}
+        		
+        		//parentPart.subUsers.add(newUser);
+        		
+        		boolean isEmpty = true;
+                        for(int i=0; i<parentPart.subUsers.size(); i++)
+                        {
+                                if(parentPart.subUsers.get( i ).id == newUser.id)
+                                {
+                                        isEmpty = false;
+                                        break;
+                                }
+                        }
+                        
+                        if(isEmpty)
+                                parentPart.subUsers.add(newUser);
+		}
+		
+		setPhone(newUser);
+		
+		return true;
+	}
+	
+	public void setPhone(UserObject user)
+	{
+		String phone1 = user.getUserInfo(3);
+		String phone2 = user.getUserInfo(5);
+		String phone3 = user.getUserInfo(4);
+		
+		phone1 = phone1.replaceAll("-", "");
+		phone1 = phone1.replaceAll(" ", "");
+		
+		phone2 = phone2.replaceAll("-", "");
+		phone2 = phone2.replaceAll(" ", "");
+		
+		phone3 = phone3.replaceAll("-", "");
+		phone3 = phone3.replaceAll(" ", "");
+		
+		synchronized(phoneNumbers)
+		{
+			if ( !phone1.equals("") ) phoneNumbers.put(phone1, user.id + "\t" + user.name);
+			if ( !phone2.equals("") ) phoneNumbers.put(phone2, user.id + "\t" + user.name);
+			if ( !phone3.equals("") ) phoneNumbers.put(phone3, user.id + "\t" + user.name);
+
+			//System.out.println("phone1:"+phone1 + ", value:"+user.id + "\t" + user.name);
+			//System.out.println("phone2:"+phone2 + ", value:"+user.id + "\t" + user.name);
+			//System.out.println("phone3:"+phone3 + ", value:"+user.id + "\t" + user.name);
+		}
+	}
+	
+	public String getIdFromPhone(String phone)
+	{
+		phone = phone.replaceAll("-", "");
+		phone = phone.replaceAll(" ", "");
+		
+		String userId = null;
+		
+		synchronized(phoneNumbers)
+		{
+			userId = phoneNumbers.get(phone);
+		}
+		
+		if ( userId == null ) return "";
+		else return userId;
+	}
+
+	/*
+	public synchronized boolean addPart(String id, String high, String name, String order, String param1)
+	{
+		PartObject newPart = new PartObject(id, high, name, order, param1);
+		parts.put(id, newPart);
+		
+		return true;
+	}
+	
+	public synchronized boolean addUser(String id, String high, String ip, String icon, String name, String password, String order, String param1, String param2, String param3)
+	{
+		UserObject newUser = new UserObject(id, high, ip, Integer.parseInt(icon), name, password, order, param1, param2, param3);
+		users.put(id, newUser);
+		
+		return true;
+	}
+	*/
+	
+	public synchronized boolean modPart(String id, String high, String name, String order, String param1)
+	{
+		PartObject part = parts.get(id);
+		
+		if ( part == null )
+		{
+			this.addPart(id, high, name, order, param1);
+		}
+		else
+		{
+		
+			if ( part.id.equals(id) && part.high.equals(high) && part.name.equals(name) && part.order.equals(order) && part.param1.equals(param1) ) return false;
+			
+			PartObject oldPart = parts.get(part.high);
+			if ( oldPart != null ) {
+				oldPart.subParts.remove(part);
+			}
+			PartObject newPart = parts.get(high);
+			if ( newPart != null ) newPart.subParts.add(part);
+			
+			part.high = high;
+			
+			part.name = name;
+			part.order = order;
+			part.param1 = param1;
+		}
+		
+		return true;
+	}
+	
+	public synchronized boolean modUser(String id, String high, String name, String password, String order, String param1, String param2, String param3)
+	{
+		UserObject user = users.get(id);
+		
+		if ( user == null )
+		{
+			this.addUser(id, high, "", "0", name, password, order, param1, param2, param3);
+		}
+		else
+		{
+			if ( user.id.equals(id) && user.high.equals(high) && user.name.equals(name) && user.password.equals(password) && user.order.equals(order) && user.param1.equals(param1) && user.param2.equals(param2) && user.param3.equals(param3) ) return false;
+			
+			PartObject oldPart = parts.get(user.high);
+			if ( oldPart != null ) oldPart.subUsers.remove(user);
+			
+			PartObject newPart = parts.get(high);
+			if ( newPart != null ) newPart.subUsers.add(user);
+			
+			user.high = high;
+			
+			user.name = name;
+			user.password = password;
+			user.order = order;
+			user.param1 = param1;
+			user.param2 = param2;
+			user.param3 = param3;
+		}
+		
+		setPhone(user);
+		
+		return true;
+	}
+	
+	public synchronized PartObject delPart(String id)
+	{
+		PartObject part = parts.get(id);
+		
+		if ( part == null ) return null;
+		
+		PartObject highPart = parts.get(part.high);
+		
+		if ( highPart != null ) highPart.subParts.remove(part);
+		
+		return parts.remove(id);
+	}
+	
+	public synchronized UserObject delUser(String id)
+	{
+		UserObject user = users.get(id);
+		
+		if ( user == null ) return null;
+		
+		PartObject highPart = parts.get(user.high);
+		
+		if ( highPart != null ) highPart.subParts.remove(user);
+		
+		return users.remove(id);
+	}
+	
+	public synchronized void SetIcon(String id, String icon)
+	{
+		UserObject usr = users.get(id);
+		
+		if ( usr != null ) usr.icon = Integer.parseInt(icon);
+	}
+	
+	public synchronized void SetNickName(String id, String nickName)
+	{
+		UserObject usr = users.get(id);
+		
+		if ( usr != null ) usr.param2 = nickName;
+	}
+	
+	/*
+	public UserObject SendMyFolder(String id, String high, String name, String icon, Connector conn)
+	{
+		UserObject usr = users.get(id);
+		
+		String nick = "";
+		
+		if ( !icon.equals("6") && usr == null ) return null;
+		
+		//System.out.println("GOT : " + id + ":" + high + ":" + name + ":" + icon);
+		if ( !icon.equals("6") )
+		{
+			//System.out.println("########################################################");
+			//System.out.println("Find : " + id + ":" + high + ":" + name + ":" + icon);
+			name = usr.name;
+			nick = usr.param2;
+			//System.out.println("Status : " + usr.icon);
+			icon = usr.icon + "";
+			
+			//System.out.println("ID : " + id + ":" + icon);
+		}
+		
+		if ( id.equals("1") )
+		{
+			UserObject requestUser = users.get(conn.ip);
+			
+			if ( requestUser != null )
+			{
+				id = requestUser.high;
+			}
+		}
+		
+		sendMessage(conn, "MyFolder\t" + id + "\t" + high + "\t" + name + "\t" + icon + "\t" + nick);
+		
+		return usr;
+	}*/
+	
+	//2014-02-15
+	public UserObject SendMyFolder(String id, String high, String name, String icon, Connector conn)
+	{
+		UserObject usr = users.get(id);
+		String nick = "";
+		String mobile = "0";
+		
+		if(icon.equals("0"))
+		{
+			//System.out.println("name:"+name +", mobile:"+usr.mobileOn);
+			mobile = Integer.toString(usr.mobileOn);
+		}
+		
+		if ( !icon.equals("6") && usr == null ) return null;
+		if ( !icon.equals("6") )
+		{
+			name = usr.name;
+			nick = usr.param2;
+			icon = usr.icon + "";
+		}
+		
+		if ( id.equals("1") )
+		{
+			UserObject requestUser = users.get(conn.ip);
+			
+			if ( requestUser != null )
+			{
+				id = requestUser.high;
+			}
+		}
+		
+		//System.out.println(" ## MyFolder id:"+id +", high:"+high +", name:"+name +" icon:"+icon +", nick:"+nick +", mobile:"+mobile);
+		sendMessage(conn, "MyFolder\t" + id + "\t" + high + "\t" + name + "\t" + icon + "\t" + nick + "\t" + mobile);
+		
+		return usr;
+	}
+	
+	public void sendMessage(Connector conn, String message)
+	{
+		if ( message.indexOf("\f") >= 0 ) message = message.replaceAll("\f", "");
+		
+		conn.send(codec.EncryptSEED(message) + "\f");
+	}
+	
+	public void addObserver(String id, ConnectorWithList connList)
+	{
+		Observer ob = obs.get(id);
+		
+		if ( ob == null )
+		{
+			ob = new Observer();
+			obs.put(id, ob);
+		}
+		
+		ob.addObserver(connList);
+	}
+	
+	public void removeObserver(String id, ConnectorWithList connList)
+	{
+		Observer ob = obs.get(id);
+		
+		if ( ob == null ) return;
+		
+		ob.removeObserver(connList);
+	}
+	
+	public ArrayList<ConnectorWithList> getObservers(String id)
+	{
+		Observer ob = obs.get(id);
+		
+		if ( ob == null ) return null;
+		else return ob.observers;
+	}
+	
+	public void sendName(Connector conn)
+	{
+		UserObject usr = users.get(conn.itemKey);
+		
+		System.out.println(conn.itemKey + " : " + usr);
+		if ( usr != null )
+			sendMessage(conn, "Name\t" + conn.itemKey + "\t" + usr.name);
+	}
+	
+	public void sendName(String id, Connector conn)
+	{
+		UserObject usr = users.get(id);
+
+		//2014-01-05 부서정보 추가, 채팅방 유저정보
+		PartObject part = parts.get(usr.high);
+		
+		if ( usr != null )
+			sendMessage(conn, "UserName\t" + id + "\t" + usr.name + "\t" + part.name);
+		
+
+		//if ( usr != null )
+			//sendMessage(conn, "UserName\t" + id + "\t" + usr.name);
+	}
+	
+	public void sendNick(Connector conn)
+	{
+		UserObject usr = users.get(conn.itemKey);
+		
+		if ( usr != null )
+			sendMessage(conn, "Nick\t" + conn.itemKey + "\t" + usr.param2);
+	}
+}

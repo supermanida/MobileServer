@@ -1,0 +1,34 @@
+package DBEmulator;
+
+import Hub.ConnectorWithList;
+
+import java.util.ArrayList;
+
+public class Observer
+{
+	public ArrayList<ConnectorWithList> observers;
+	
+	public Observer()
+	{
+		observers = new ArrayList<ConnectorWithList>();
+	}
+	
+	public synchronized void addObserver(ConnectorWithList conn)
+	{
+		while ( !observers.contains(conn) )
+			observers.add(conn);
+	}
+	
+	public synchronized void removeObserver(ConnectorWithList conn)
+	{
+		while ( observers.contains(conn) )
+		{
+			observers.remove(conn);
+		}
+	}
+	
+	public synchronized ArrayList<ConnectorWithList> getObservers()
+	{
+		return observers;
+	}
+}
