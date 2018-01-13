@@ -17,6 +17,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Future;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import CombiEngine.Mobile.MobileService;
 import CombiEngine.Selector.Connector;
 import DBEmulator.DataBean;
@@ -27,6 +30,8 @@ import java.util.GregorianCalendar;
 import java.util.Calendar;
 
 public class MobileServer extends MobileService {
+	private static final Logger logger = LogManager.getLogger(MobileServer.class);
+	
 	HubProcessor hub;
 
 	public MobileServer(ConcurrentHashMap<String, String> config) {
@@ -57,7 +62,7 @@ public class MobileServer extends MobileService {
 		MobileServer.resetConfig(confPath, config);
 
 		new MobileServer(config);
-		System.out.println("Service started with port : " + config.get("SERVICE_PORT"));
+		logger.info("Service started with port : " + config.get("SERVICE_PORT"));
 
 	}
 
@@ -117,7 +122,7 @@ public class MobileServer extends MobileService {
 		} else if (command.equals("SubOrganizationRequest") && param.size() == 1) {
 			hub.subOrganizationRequest(param.get(0), conn);
 		} else if (command.equals("SearchRequest") && param.size() == 2) {
-			System.out.println("[MobileServer] SearchRequest! ");
+			logger.info("[MobileServer] SearchRequest! ");
 			hub.searchRequest(param.get(0), param.get(1), conn);
 		} else if (command.equals("ROOM_SYNCH")) {
 			hub.sendRoomSyn(param, conn);
@@ -177,7 +182,7 @@ public class MobileServer extends MobileService {
 				UserObject user = (UserObject) it.next();
 
 				if (user.name.indexOf(name + "#") == 0) {
-					System.out.println("NameLogin Find:" + user.name + ", str:" + name);
+					logger.info("NameLogin Find:" + user.name + ", str:" + name);
 					count++;
 
 					// id, name, email
@@ -189,7 +194,7 @@ public class MobileServer extends MobileService {
 				conn.send(codec.EncryptSEED("NoUser") + "\f");
 			else if (count == 1) {
 				String id = result.substring(0, result.indexOf(","));
-				System.out.println("count 1 ID=>" + id);
+				logger.info("count 1 ID=>" + id);
 				conn.send(codec.EncryptSEED("Login\t" + id) + "\f");
 			} else if (count > 1) {
 				conn.send(codec.EncryptSEED("MultiUser\t" + result) + "\f");
@@ -215,10 +220,10 @@ public class MobileServer extends MobileService {
 
 			conn.send(codec.EncryptSEED("SETIDEND") + "\f");
 		} else if (command.equals("CompareTokenToServer")) {
-			System.out.println("[MobileServer] command:" + command + ", p size:" + param.size() + ", param:" + param);
+			logger.info("command:" + command + ", p size:" + param.size() + ", param:" + param);
 			compareTokenRequest(conn, param.get(0), param.get(1), param.get(2), param.get(3));
 		} else if (command.equals("UpdatePinToServer")) {
-			System.out.println("[MobileServer] command:" + command + ", p size:" + param.size() + ", param:" + param);
+			logger.info("command:" + command + ", p size:" + param.size() + ", param:" + param);
 			pinUpdateRequest(conn, param.get(0), param.get(1));
 		} else if (command.equals("TokenCompare")) {
 			// compareToken(conn, param.get(0), param.get(1), param.get(2));
@@ -419,16 +424,17 @@ public class MobileServer extends MobileService {
 	}
 
 	private void updateNameUserObject(Connector conn, String userId, String name) {
+		logger.info(userId);
 		UserObject user = hub.dataBean.users.get(userId);
 		if (user != null) {
 			user.setName(name);
 			conn.send(codec.EncryptSEED("NAME_CHANGED\t" + user.name) + "\f");
 
 			hub.sendModUser(user);
-			System.out.println("[MobileServer] updateNameUserObject -> versionUpdate call");
+			
 			versionUpdate(conn, userId, 0, name);
 		} else {
-			System.out.println("[MobileServer] updateNameUserObject user null id:" + userId);
+			logger.info("user is null [" + userId + "]");
 		}
 	}
 
@@ -444,23 +450,26 @@ public class MobileServer extends MobileService {
 
 	private void photoVersionUpdate(final String userId) {
 
+		//2018-01-13 leesh for Use PreparedStatement
 		//2017-12-13
 		Runnable runnable = new Runnable(){
             @Override
             public void run(){
             	Connection dbconn = null;
-				Statement stmt = null;
-				ResultSet rset = null;
+            	PreparedStatement ps = null;
+				ResultSet rs = null;
 
+				String sql = "SELECT CNT FROM PHOTO_CNT WHERE USER_ID=?";
 				try {
 					dbconn = dbcpCert.getConnection();
-					stmt = dbconn.createStatement();
-					dbconn.setAutoCommit(false);
-
+					ps = dbconn.prepareStatement(sql);
+					
 					try {
-						rset = stmt.executeQuery("select CNT from PHOTO_CNT where USER_ID like '" + userId + "'");
-						if (rset.next()) {
-							String cnt = rset.getString(1);
+						ps.setString(1, userId);
+						rs = ps.executeQuery();
+						
+						if (rs.next()) {
+							String cnt = rs.getString(1);
 							if (cnt != null) {
 								UserObject user = hub.dataBean.users.get(userId);
 								if (user != null) {
@@ -476,7 +485,6 @@ public class MobileServer extends MobileService {
 							}
 						}
 
-						dbconn.setAutoCommit(true);
 					} catch (Exception ee) {
 						ee.getStackTrace();
 						return;
@@ -485,8 +493,7 @@ public class MobileServer extends MobileService {
 					ee.printStackTrace();
 					return;
 				} finally {
-
-					dbcpCert.freeConnection(dbconn, stmt, rset);
+					dbcpCert.freeConnection(dbconn, ps, rs);
 				}
             }
         };
@@ -567,22 +574,22 @@ public class MobileServer extends MobileService {
 						rset = stmt.executeQuery("select USER_ID from PHOTO_CNT where USER_ID like '" + userId + "'");
 						if (rset.next()) {
 							if (type == NAME)
-								stmt.execute(
-										"UPDATE PHOTO_CNT SET NAMEVERSION = ( SELECT nvl(NAMEVERSION,0)+1 FROM PHOTO_CNT WHERE USER_ID ='"
+								stmt.execute("UPDATE PHOTO_CNT SET NAMEVERSION = ( SELECT nvl(NAMEVERSION,0)+1 FROM PHOTO_CNT WHERE USER_ID ='"
 												+ userId + "') WHERE USER_ID = " + "'" + userId + "'");
 							else if (type == NICK)
-								stmt.execute(
-										"UPDATE PHOTO_CNT SET NICKVERSION = ( SELECT nvl(NICKVERSION,0)+1 FROM PHOTO_CNT WHERE USER_ID ='"
+								stmt.execute("UPDATE PHOTO_CNT SET NICKVERSION = ( SELECT nvl(NICKVERSION,0)+1 FROM PHOTO_CNT WHERE USER_ID ='"
 												+ userId + "') WHERE USER_ID = " + "'" + userId + "'");
-						} else
+						} else {
 							stmt.execute("insert into PHOTO_CNT(USER_ID) values('" + userId + "')");
-
+						}
+							
+						rset.close();
 						dbconn.setAutoCommit(true);
 
 						if (type == NAME) {
-							rset = stmt.executeQuery(
-									"select NAMEVERSION from PHOTO_CNT where USER_ID like '" + userId + "'");
-
+							rset = stmt.executeQuery("select NAMEVERSION from PHOTO_CNT where USER_ID like '" + userId + "'");
+							
+							
 							String ver = "";
 							if (rset.next()) {
 								ver = rset.getString(1);
@@ -594,8 +601,7 @@ public class MobileServer extends MobileService {
 								user.setNameVersion(Integer.parseInt(ver));
 						} else if (type == NICK) {
 
-							rset = stmt.executeQuery(
-									"select NICKVERSION from PHOTO_CNT where USER_ID like '" + userId + "'");
+							rset = stmt.executeQuery("select NICKVERSION from PHOTO_CNT where USER_ID like '" + userId + "'");
 
 							// 2017-10-20 check logic rset.next no
 							String ver = "";

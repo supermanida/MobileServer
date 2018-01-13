@@ -12,6 +12,9 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.json.JSONObject;
 import CombiEngine.Codec.AmCodec;
 import CombiEngine.Processor.CombiService;
@@ -44,6 +47,8 @@ import java.sql.Statement;
 //
 
 public class MobileService extends CombiService implements Runnable {
+	private static final Logger logger = LogManager.getLogger(MobileService.class);
+	
 	private final String charset;
 	public ConcurrentHashMap<String, ConcurrentLinkedQueue<Connector>> userMap;
 	public ConcurrentHashMap<String, String> config;
@@ -618,32 +623,42 @@ public class MobileService extends CombiService implements Runnable {
 			final String msgId, final String senderName, final String date, final String title, final String url,
 			final String type, final String data1, final String data2) {
 		
+		//2018-01-13 leesh for Use PreparedStatement
 		//2017-12-13
 		Runnable runnable = new Runnable(){
             @Override
             public void run(){
             	Connection dbconn = null;
-				Statement stmt = null;
+            	PreparedStatement ps = null;
 				ResultSet rset = null;
+				
+				String sql = "SELECT USER_ID, TOKEN FROM MSG_USERDATA_CENTER WHERE USER_ID=?";
+				
 				try {
 					dbconn = dbcpMsger.getConnection();
-					stmt = dbconn.createStatement();
+					ps = dbconn.prepareStatement(sql);
 					try {
 						String myToken = "";
 						String toToken = "";
-						rset = stmt.executeQuery(
-								"select USER_ID, TOKEN from MSG_USERDATA_CENTER where USER_ID like '" + myId + "'");
+						
+						ps.setString(1, myId);
+						rset = ps.executeQuery();
 						if (rset.next()) {
-							String value = rset.getString(1);
 							myToken = rset.getString(2);
 						}
-						rset = stmt.executeQuery(
-								"select USER_ID, TOKEN from MSG_USERDATA_CENTER where USER_ID like '" + userId + "'");
+						
+						rset.close();
+						ps.clearParameters();
+						
+						ps.setString(1, userId);
+						rset = ps.executeQuery();
 						if (rset.next()) {
-							String value3 = rset.getString(1);
 							toToken = rset.getString(2);
 						}
-						System.out.println("[TEST] myToken:" + myToken + ", toTken:" + toToken);
+					
+						
+						logger.info("myToken:" + myToken + ", toTken:" + toToken);
+						
 						String dec = AriaWrapper.decryptSkeyWrapper(myToken, data2);
 						String enc = data1 + "#";
 						enc += AriaWrapper.encryptSkeyWrapper(toToken, dec);
@@ -668,7 +683,7 @@ public class MobileService extends CombiService implements Runnable {
 					return;
 				} finally {
 					
-					dbcpMsger.freeConnection(dbconn, stmt, rset);
+					dbcpMsger.freeConnection(dbconn, ps, rset);
 				}
             }
         };

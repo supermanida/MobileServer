@@ -247,7 +247,12 @@ public class HubProcessor extends Thread {
 				dataBean.addSubUser();
 
 				isOrgEnd = true;
-				writeOrgFile();
+
+				//2018-01-13 leesh for Organization file backup
+				String useOrgFileBackup = parent.config.get("USE_ORG_BACKUP");
+				if (useOrgFileBackup.equals("Y")) {
+					writeOrgFile();
+				}
 			} else if (command.equals("CNT") && param.size() >= 2) {
 				dataBean.SetIcon((String) param.get(0), "1");
 
@@ -1880,28 +1885,50 @@ public class HubProcessor extends Thread {
 		}
 	}
 
+	//2018-01-13 leesh for Organization file backup
 	public void writeOrgFile() {
 		try {
-			FileWriter fw = new FileWriter("/home/center/Group.txt");
+			String deptBackupFilePath = parent.config.get("PATH_DEPT_FILE");
+    		String userBackupFilePath = parent.config.get("PATH_USER_FILE");
+    		
+			FileWriter fw = new FileWriter(deptBackupFilePath);
 			Iterator<PartObject> it = dataBean.parts.values().iterator();
+			
+			StringBuilder sb = new StringBuilder();
+			
 			while (it.hasNext()) {
 				PartObject part = it.next();
-				if (part != null)
-					fw.write(part.id + "\t" + part.high + "\t" + part.name + "\t" + part.order + "\n");
+				if (part != null) {
+					sb.append(part.id).append("\t");
+					sb.append(part.high).append("\t");
+					sb.append(part.name).append("\t");
+					sb.append(part.order).append("\r\n");
+				}
 			}
-
-			FileWriter fw2 = new FileWriter("/home/center/User.txt");
+			
+			fw.write(sb.toString());
+			
+			sb.delete(0, sb.length());
+			
+			FileWriter fw2 = new FileWriter(userBackupFilePath);
 			Iterator<UserObject> it2 = dataBean.users.values().iterator();
 			while (it2.hasNext()) {
 				UserObject user = it2.next();
-				if (user != null)
-					fw2.write(user.id + "\t" + user.high + "\t" + user.name + "\t" + user.password + "\t" + user.order
-							+ "\n");
+				if (user != null) {
+					sb.append(user.id).append("\t");
+					sb.append(user.high).append("\t");
+					sb.append(user.name).append("\t");
+					sb.append(user.password).append("\t");
+					sb.append(user.order).append("\r\n");
+				}
 			}
+			
+			fw2.write(sb.toString());
 
 			fw.flush();
-			fw.close();
 			fw2.flush();
+			
+			fw.close();
 			fw2.close();
 		} catch (IOException e) {
 			e.printStackTrace();

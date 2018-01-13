@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+ 	<Appenders>
+		<Console name="console" target="SYSTEM_OUT">
+			<PatternLayout pattern="%d{yyyy-HH-dd mm:ss} %-5p %l - %msg%n"/>
+		</Console>
+		<RollingFile name="file" fileName="../logs/mobile.log" filePattern="./logs/noti.log.%d{yyyy-MM-dd}" append="false">
+			<PatternLayout pattern="%d{yyyy-HH-dd mm:ss} %-5p %l - %m%n"/>
+			<Policies>
+				<TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+			</Policies>
+		</RollingFile>
+	</Appenders>
+	<Loggers>
+		<Root level="debug">
+			<AppenderRef ref="console"/>
+			<AppenderRef ref="file"/>
+		</Root>
+	</Loggers>
+</Configuration>
